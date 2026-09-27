@@ -54,7 +54,7 @@ def render_caption_image(text, video_width=720, font_size=48, max_chars_per_line
     return np.array(img)
 
 
-def split_line_into_chunks(text, words_per_chunk=5):
+def split_line_into_chunks(text, words_per_chunk=8):
     words = text.split()
     if not words:
         return []

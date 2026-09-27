@@ -4,16 +4,16 @@ from groq import Groq
 client = Groq()
 
 SYSTEM_PROMPT = (
-    "You write short, punchy DIALOGUE scripts for 30-45 second faceless short-form "
+    "You write short, punchy DIALOGUE scripts for 15-25 second faceless short-form "
     "videos (TikTok/Reels/Shorts style), between two characters: HOST and GUEST. "
     "Output ONLY the dialogue, one line per turn, in this EXACT format:\n"
     "HOST: <line>\n"
     "GUEST: <line>\n"
     "...\n"
     "No stage directions, no markdown, no headers, no narration outside the HOST/GUEST lines. "
-    "Keep each line short and punchy for text-to-speech pacing. Alternate turns naturally, "
-    "3 to 5 exchanges total, covering a hook, three surprising facts, and a call-to-action to follow for more."
-)
+    "Keep each line SHORT (under 12 words) for text-to-speech pacing. "
+    "Exactly 4 exchanges total (8 lines): a hook, two surprising facts, and a call-to-action to follow for more."
+))
 
 
 def _fallback_dialogue(topic: str):

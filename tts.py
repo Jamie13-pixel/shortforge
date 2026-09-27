@@ -32,26 +32,26 @@ async def create_dialogue_voice(dialogue, output_file, temp_dir="data/temp_clips
             line_paths.append((speaker, text, path))
 
         clips = []
-        timeline = []
-        current_time = 0.0
+timeline = []
+current_time = 0.0
 
-        for speaker, text, path in line_paths:
-            clip = AudioFileClip(path)
-            duration = clip.duration
-            timeline.append({
-                "speaker": speaker,
-                "text": text,
-                "start": current_time,
-                "duration": duration,
-            })
-            clips.append(clip)
-            current_time += duration
+for speaker, text, path in line_paths:
+    clip = AudioFileClip(path)
+    duration = clip.duration
+    timeline.append({
+        "speaker": speaker,
+        "text": text,
+        "start": current_time,
+        "duration": duration,
+    })
+    clips.append(clip)
+    current_time += duration
 
-        final_audio = concatenate_audioclips(clips)
-        final_audio.write_audiofile(output_file, logger=None)
+final_audio = concatenate_audioclips(clips)
+final_audio.write_audiofile(output_file, logger=None)
 
-        for clip in clips:
-            clip.close()
+for clip in clips:
+    clip.close()
 
         return timeline
 

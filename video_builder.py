@@ -73,7 +73,7 @@ def build_video(audio_file, output_file, topic="", timeline=None):
 
         final.write_videofile(
             output_file,
-            fps=24,
+            fps=20,
             codec="libx264",
             preset="ultrafast",
             threads=os.cpu_count() or 4,
