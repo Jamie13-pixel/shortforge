@@ -2,16 +2,21 @@ import textwrap
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+FONT_PATHS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux (Railway/Docker)
+    "arial.ttf",  # Windows fallback
+    "DejaVuSans-Bold.ttf",
+]
+
 
 def _load_font(size):
-    try:
-        return ImageFont.truetype("arial.ttf", size)
-    except Exception:
+    for path in FONT_PATHS:
         try:
-            return ImageFont.truetype("DejaVuSans-Bold.ttf", size)
+            return ImageFont.truetype(path, size)
         except Exception:
-            return ImageFont.load_default()
-
+            continue
+    print("[captions] WARNING: no TTF font found, falling back to default bitmap font")
+    return ImageFont.load_default()
 
 def render_caption_image(text, video_width=1080, font_size=70, max_chars_per_line=22):
     font = _load_font(font_size)
