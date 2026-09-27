@@ -30,7 +30,7 @@ def build_video(audio_file, output_file, topic="", script_text=""):
     audio = AudioFileClip(audio_file)
     target_duration = audio.duration
 
-    clip_urls = search_video_clips(topic or "abstract background", count=3)
+    clip_urls = search_video_clips(topic or "abstract background", count=2)
     if not clip_urls:
         raise ValueError(f"No stock footage found for topic: {topic}")
 
