@@ -114,6 +114,12 @@ async def generate_video(request: Request, body: VideoRequest):
         "check_status_url": f"/status/{job_id}",
     }
 
+@app.get("/debug-fonts")
+def debug_fonts():
+    import glob
+    matches = glob.glob("/usr/share/fonts/**/*.ttf", recursive=True)
+    matches += glob.glob("/usr/local/share/fonts/**/*.ttf", recursive=True)
+    return {"found_fonts": matches, "count": len(matches)}
 
 @app.get("/status/{job_id}")
 def check_status(job_id: str):
