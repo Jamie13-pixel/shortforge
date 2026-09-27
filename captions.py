@@ -1,19 +1,25 @@
+import os
 import textwrap
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 FONT_PATHS = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux (Railway/Docker)
-    "arial.ttf",  # Windows fallback
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "arial.ttf",
     "DejaVuSans-Bold.ttf",
 ]
 
 
 def _load_font(size):
     for path in FONT_PATHS:
+        exists = os.path.exists(path) if path.startswith("/") else "N/A (relative)"
+        print(f"[captions] Trying font path: {path} | exists: {exists}")
         try:
-            return ImageFont.truetype(path, size)
-        except Exception:
+            font = ImageFont.truetype(path, size)
+            print(f"[captions] Successfully loaded font: {path}")
+            return font
+        except Exception as e:
+            print(f"[captions] Failed to load {path}: {e}")
             continue
     print("[captions] WARNING: no TTF font found, falling back to default bitmap font")
     return ImageFont.load_default()
