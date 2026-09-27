@@ -9,37 +9,37 @@ import traceback
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-from tts import create_voice
+from tts import create_dialogue_voice
 from video_builder import build_video
 from script_generator import generate_script
 from jobs import create_job, set_status, set_result, set_error, get_job, JobStatus
 from rate_limiter import limiter, check_daily_limit, get_daily_usage, DAILY_GENERATION_LIMIT
 
 app = FastAPI()
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # tighten this to your real frontend URL once deployed
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-os.makedirs("videos", exist_ok=True)
-os.makedirs("audio", exist_ok=True)
-os.makedirs("temp_clips", exist_ok=True)
-app.mount("/videos", StaticFiles(directory="videos"), name="videos")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+os.makedirs("data/videos", exist_ok=True)
+os.makedirs("data/audio", exist_ok=True)
+os.makedirs("data/temp_clips", exist_ok=True)
+app.mount("/videos", StaticFiles(directory="data/videos"), name="videos")
 app.mount("/app", StaticFiles(directory="static", html=True), name="static")
 
 
 def clear_temp_clips():
-    temp_dir = "temp_clips"
+    temp_dir = "data/temp_clips"
     if os.path.exists(temp_dir):
         for f in os.listdir(temp_dir):
             try:
@@ -69,20 +69,20 @@ async def process_video_job(job_id: str, topic: str):
     set_status(job_id, JobStatus.PROCESSING)
 
     file_stem = safe_filename(topic)
-    audio_file = f"audio/{file_stem}.mp3"
-    video_file = f"videos/{file_stem}.mp4"
+    audio_file = f"data/audio/{file_stem}.mp3"
+    video_file = f"data/videos/{file_stem}.mp4"
 
     try:
-        script = await asyncio.to_thread(generate_script, topic)
+        script_text, dialogue = await asyncio.to_thread(generate_script, topic)
 
-        await create_voice(script, audio_file)
+        timeline = await create_dialogue_voice(dialogue, audio_file)
 
-        await asyncio.to_thread(build_video, audio_file, video_file, topic, script)
+        await asyncio.to_thread(build_video, audio_file, video_file, topic, timeline)
 
         set_result(job_id, {
             "success": True,
             "topic": topic,
-            "script": script,
+            "script": script_text,
             "audio": audio_file,
             "video": video_file,
             "download_url": f"/videos/{file_stem}.mp4",
@@ -132,7 +132,4 @@ def check_status(job_id: str):
 
 @app.get("/usage")
 def usage():
-    return {
-        "used_today": get_daily_usage(),
-        "daily_limit": DAILY_GENERATION_LIMIT,
-    }
+    return {"used_today": get_daily_usage(), "daily_limit": DAILY_GENERATION_LIMIT}

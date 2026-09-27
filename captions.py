@@ -1,4 +1,3 @@
-import os
 import textwrap
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -9,22 +8,24 @@ FONT_PATHS = [
     "DejaVuSans-Bold.ttf",
 ]
 
+SPEAKER_COLORS = {
+    "HOST": "white",
+    "GUEST": "#FFD54A",
+}
+DEFAULT_COLOR = "white"
+
 
 def _load_font(size):
     for path in FONT_PATHS:
-        exists = os.path.exists(path) if path.startswith("/") else "N/A (relative)"
-        print(f"[captions] Trying font path: {path} | exists: {exists}")
         try:
-            font = ImageFont.truetype(path, size)
-            print(f"[captions] Successfully loaded font: {path}")
-            return font
-        except Exception as e:
-            print(f"[captions] Failed to load {path}: {e}")
+            return ImageFont.truetype(path, size)
+        except Exception:
             continue
     print("[captions] WARNING: no TTF font found, falling back to default bitmap font")
     return ImageFont.load_default()
 
-def render_caption_image(text, video_width=1080, font_size=70, max_chars_per_line=22):
+
+def render_caption_image(text, video_width=720, font_size=48, max_chars_per_line=22, color="white"):
     font = _load_font(font_size)
     wrapped_lines = textwrap.wrap(text, width=max_chars_per_line) or [text]
 
@@ -38,58 +39,57 @@ def render_caption_image(text, video_width=1080, font_size=70, max_chars_per_lin
         line_widths.append(bbox[2] - bbox[0])
         line_heights.append(bbox[3] - bbox[1])
 
-    line_spacing = 15
-    total_height = sum(line_heights) + line_spacing * (len(wrapped_lines) - 1) + 40
+    line_spacing = 12
+    total_height = sum(line_heights) + line_spacing * (len(wrapped_lines) - 1) + 30
 
     img = Image.new("RGBA", (video_width, total_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    y = 20
+    y = 15
     for line, lh, lw in zip(wrapped_lines, line_heights, line_widths):
         x = (video_width - lw) / 2
-        draw.text(
-            (x, y),
-            line,
-            font=font,
-            fill="white",
-            stroke_width=4,
-            stroke_fill="black",
-        )
+        draw.text((x, y), line, font=font, fill=color, stroke_width=4, stroke_fill="black")
         y += lh + line_spacing
 
     return np.array(img)
 
 
-def split_script_into_chunks(script_text, words_per_chunk=6):
-    words = script_text.replace("\n", " ").split()
-    chunks = []
-    for i in range(0, len(words), words_per_chunk):
-        chunks.append(" ".join(words[i:i + words_per_chunk]))
-    return chunks
+def split_line_into_chunks(text, words_per_chunk=5):
+    words = text.split()
+    if not words:
+        return []
+    return [" ".join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
 
 
-def build_caption_clips(script_text, total_duration, video_width=1080, video_height=1920):
+def build_caption_clips(timeline, video_width=720, video_height=1280):
     from moviepy import ImageClip
 
-    chunks = split_script_into_chunks(script_text)
-    if not chunks:
-        return []
-
-    word_counts = [len(c.split()) for c in chunks]
-    total_words = sum(word_counts)
-
     clips = []
-    t = 0.0
-    for chunk, wc in zip(chunks, word_counts):
-        duration = total_duration * (wc / total_words)
-        img_array = render_caption_image(chunk, video_width=video_width)
-        clip = (
-            ImageClip(img_array)
-            .with_duration(duration)
-            .with_start(t)
-            .with_position(("center", int(video_height * 0.72)))
-        )
-        clips.append(clip)
-        t += duration
+    for entry in timeline:
+        speaker = entry["speaker"]
+        text = entry["text"]
+        line_start = entry["start"]
+        line_duration = entry["duration"]
+        color = SPEAKER_COLORS.get(speaker, DEFAULT_COLOR)
+
+        chunks = split_line_into_chunks(text)
+        if not chunks:
+            continue
+
+        word_counts = [len(c.split()) for c in chunks]
+        total_words = sum(word_counts) or 1
+
+        t = line_start
+        for chunk, wc in zip(chunks, word_counts):
+            chunk_duration = line_duration * (wc / total_words)
+            img_array = render_caption_image(chunk, video_width=video_width, color=color)
+            clip = (
+                ImageClip(img_array)
+                .with_duration(chunk_duration)
+                .with_start(t)
+                .with_position(("center", int(video_height * 0.72)))
+            )
+            clips.append(clip)
+            t += chunk_duration
 
     return clips

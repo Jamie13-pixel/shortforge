@@ -25,7 +25,7 @@ def _cover_resize_crop(clip, target_w=TARGET_W, target_h=TARGET_H):
     )
 
 
-def build_video(audio_file, output_file, topic="", script_text=""):
+def build_video(audio_file, output_file, topic="", timeline=None):
     audio = AudioFileClip(audio_file)
     target_duration = audio.duration
 
@@ -65,10 +65,7 @@ def build_video(audio_file, output_file, topic="", script_text=""):
         combined = concatenate_videoclips(sequence, method="compose")
         combined = combined.subclipped(0, target_duration)
 
-        caption_clips = (
-            build_caption_clips(script_text, target_duration, TARGET_W, TARGET_H)
-            if script_text else []
-        )
+        caption_clips = build_caption_clips(timeline, TARGET_W, TARGET_H) if timeline else []
 
         layers = [combined] + caption_clips
         final_video = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H))
@@ -90,14 +87,12 @@ def build_video(audio_file, output_file, topic="", script_text=""):
                 clip.close()
             except Exception:
                 pass
-
         for path in downloaded_paths:
             try:
                 if os.path.exists(path):
                     os.remove(path)
             except Exception as e:
                 print(f"[video_builder] Failed to delete temp file {path}: {e}")
-
         try:
             audio.close()
         except Exception:
