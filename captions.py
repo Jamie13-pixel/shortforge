@@ -1,3 +1,4 @@
+import glob
 import textwrap
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -15,31 +16,34 @@ SPEAKER_COLORS = {
 DEFAULT_COLOR = "white"
 
 
-import glob
-
 def _load_font(size):
     for path in FONT_PATHS:
         try:
-            return ImageFont.truetype(path, size)
-        except Exception:
+            font = ImageFont.truetype(path, size)
+            print(f"[captions] Loaded font from FONT_PATHS: {path}")
+            return font
+        except Exception as e:
+            print(f"[captions] Failed FONT_PATHS entry '{path}': {e}")
             continue
 
-    # Last resort: search common Linux font directories for ANY usable TTF
-    search_dirs = [
-        "/usr/share/fonts/",
-        "/usr/local/share/fonts/",
-    ]
+    search_dirs = ["/usr/share/fonts/", "/usr/local/share/fonts/"]
+    all_matches = []
     for base in search_dirs:
         matches = glob.glob(f"{base}**/*.ttf", recursive=True)
-        if matches:
-            try:
-                print(f"[captions] Using discovered font: {matches[0]}")
-                return ImageFont.truetype(matches[0], size)
-            except Exception:
-                continue
+        print(f"[captions] Searched {base} -> found {len(matches)} ttf files: {matches[:5]}")
+        all_matches.extend(matches)
+
+    if all_matches:
+        try:
+            font = ImageFont.truetype(all_matches[0], size)
+            print(f"[captions] Loaded discovered font: {all_matches[0]}")
+            return font
+        except Exception as e:
+            print(f"[captions] Failed to load discovered font {all_matches[0]}: {e}")
 
     print("[captions] WARNING: no TTF font found anywhere, falling back to default bitmap font")
     return ImageFont.load_default()
+
 
 def render_caption_image(text, video_width=720, font_size=48, max_chars_per_line=22, color="white"):
     font = _load_font(font_size)
