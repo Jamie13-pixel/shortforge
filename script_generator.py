@@ -16,9 +16,9 @@ SYSTEM_PROMPT = (
 )
 
 
-def _fallback_dialogue(topic: str):
+def _fallback_dialogue(topic):
     return [
-        ("HOST", f"Did you know these facts about {topic}?"),
+        ("HOST", "Did you know these facts about " + topic + "?"),
         ("GUEST", "Tell me more!"),
         ("HOST", "Here's fact one."),
         ("GUEST", "Whoa, really?"),
@@ -27,7 +27,7 @@ def _fallback_dialogue(topic: str):
     ]
 
 
-def parse_dialogue(raw_text: str):
+def parse_dialogue(raw_text):
     dialogue = []
     pattern = re.compile(r"^\s*(HOST|GUEST)\s*:\s*(.+)$", re.IGNORECASE)
     for line in raw_text.splitlines():
@@ -40,12 +40,36 @@ def parse_dialogue(raw_text: str):
     return dialogue
 
 
-def generate_script(topic: str):
+def generate_script(topic):
     try:
+        user_prompt = "Write a short dialogue script about: " + topic + "."
+
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             max_tokens=1500,
             temperature=0.8,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Write a short dialogue script
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        content = response.choices[0].message.content
+        text = content.strip() if content else ""
+
+        if not text:
+            print("[script_generator] EMPTY CONTENT. finish_reason=" + str(response.choices[0].finish_reason))
+            print("[script_generator] Full response object: " + str(response))
+            raise ValueError("Empty response from model")
+
+        dialogue = parse_dialogue(text)
+        if not dialogue:
+            print("[script_generator] Could not parse dialogue from raw text: " + repr(text))
+            raise ValueError("Could not parse dialogue format from model output")
+
+        return text, dialogue
+
+    except Exception as e:
+        print("[script_generator] Groq call failed, using fallback: " + str(e))
+        dialogue = _fallback_dialogue(topic)
+        text = "\n".join(spk + ": " + line for spk, line in dialogue)
+        return text, dialogue
