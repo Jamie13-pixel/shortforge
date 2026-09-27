@@ -15,15 +15,31 @@ SPEAKER_COLORS = {
 DEFAULT_COLOR = "white"
 
 
+import glob
+
 def _load_font(size):
     for path in FONT_PATHS:
         try:
             return ImageFont.truetype(path, size)
         except Exception:
             continue
-    print("[captions] WARNING: no TTF font found, falling back to default bitmap font")
-    return ImageFont.load_default()
 
+    # Last resort: search common Linux font directories for ANY usable TTF
+    search_dirs = [
+        "/usr/share/fonts/",
+        "/usr/local/share/fonts/",
+    ]
+    for base in search_dirs:
+        matches = glob.glob(f"{base}**/*.ttf", recursive=True)
+        if matches:
+            try:
+                print(f"[captions] Using discovered font: {matches[0]}")
+                return ImageFont.truetype(matches[0], size)
+            except Exception:
+                continue
+
+    print("[captions] WARNING: no TTF font found anywhere, falling back to default bitmap font")
+    return ImageFont.load_default()
 
 def render_caption_image(text, video_width=720, font_size=48, max_chars_per_line=22, color="white"):
     font = _load_font(font_size)
