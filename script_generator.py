@@ -13,7 +13,7 @@ SYSTEM_PROMPT = (
     "No stage directions, no markdown, no headers, no narration outside the HOST/GUEST lines. "
     "Keep each line SHORT (under 12 words) for text-to-speech pacing. "
     "Exactly 4 exchanges total (8 lines): a hook, two surprising facts, and a call-to-action to follow for more."
-))
+)
 
 
 def _fallback_dialogue(topic: str):
@@ -23,8 +23,6 @@ def _fallback_dialogue(topic: str):
         ("HOST", "Here's fact one."),
         ("GUEST", "Whoa, really?"),
         ("HOST", "Here's fact two."),
-        ("GUEST", "That's wild."),
-        ("HOST", "And fact three."),
         ("GUEST", "Follow for more like this!"),
     ]
 
@@ -43,7 +41,6 @@ def parse_dialogue(raw_text: str):
 
 
 def generate_script(topic: str):
-    """Returns (raw_script_text, dialogue_list) where dialogue_list is [(speaker, line), ...]."""
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
