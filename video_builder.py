@@ -12,7 +12,7 @@ from moviepy import (
 from stock_footage import search_video_clips, download_clip
 from captions import build_caption_clips
 
-TARGET_W, TARGET_H = 1080, 1920
+TARGET_W, TARGET_H = 720, 1280
 
 
 def _cover_resize_crop(clip, target_w=TARGET_W, target_h=TARGET_H):
@@ -30,7 +30,7 @@ def build_video(audio_file, output_file, topic="", script_text=""):
     audio = AudioFileClip(audio_file)
     target_duration = audio.duration
 
-    clip_urls = search_video_clips(topic or "abstract background", count=2)
+    clip_urls = search_video_clips(topic or "abstract background", count=1)
     if not clip_urls:
         raise ValueError(f"No stock footage found for topic: {topic}")
 
@@ -42,24 +42,20 @@ def build_video(audio_file, output_file, topic="", script_text=""):
         return path
 
     downloaded_paths = []
-    raw_clips = []
-
+for url in clip_urls:
+    path = f"data/temp_clips/{uuid.uuid4().hex}.mp4"
     try:
-        with ThreadPoolExecutor(max_workers=len(clip_urls)) as ex:
-            downloaded_paths = list(ex.map(_dl, clip_urls))
+        download_clip(url, path)
+        downloaded_paths.append(path)
+    except Exception as e:
+        print(f"[video_builder] Skipping clip after repeated failures: {e}")
 
-        raw_clips = [VideoFileClip(p) for p in downloaded_paths]
-        clips = [_cover_resize_crop(c) for c in raw_clips]
-
-        sequence = []
-        accumulated = 0
-        i = 0
-        while accumulated < target_duration:
-            clip = clips[i % len(clips)]
-            sequence.append(clip)
-            accumulated += clip.duration
-            i += 1
-
+       raw_clips = [VideoFileClip(p) for p in downloaded_paths]
+clips = []
+for c in raw_clips:
+    resized = _cover_resize_crop(c)
+    clips.append(resized)
+            
         combined = concatenate_videoclips(sequence, method="compose")
         combined = combined.subclipped(0, target_duration)
 
