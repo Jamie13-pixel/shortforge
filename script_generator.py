@@ -44,28 +44,8 @@ def generate_script(topic: str):
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
-            max_tokens=800,
+            max_tokens=1500,
             temperature=0.8,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Write a short dialogue script about: {topic}."},
-            ],
-        )
-        content = response.choices[0].message.content
-        text = content.strip() if content else ""
-        if not text:
-            print(f"[script_generator] Empty content. Full response: {response}")
-            raise ValueError("Empty response from model")
-
-        dialogue = parse_dialogue(text)
-        if not dialogue:
-            print(f"[script_generator] Could not parse dialogue from: {text}")
-            raise ValueError("Could not parse dialogue format from model output")
-
-        return text, dialogue
-
-    except Exception as e:
-        print(f"[script_generator] Groq call failed, using fallback: {e}")
-        dialogue = _fallback_dialogue(topic)
-        text = "\n".join(f"{spk}: {line}" for spk, line in dialogue)
-        return text, dialogue
+                {"role": "user", "content": f"Write a short dialogue script
