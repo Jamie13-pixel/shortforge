@@ -79,12 +79,18 @@ def verify_password(password, stored):
 
 def create_user(name, email, password):
     user_id = secrets.token_hex(16)
+    normalized_email = email.strip().lower()
     reset_date = _next_month_start().isoformat()
     with _conn() as c:
-        c.execute(
-            'INSERT INTO users(id,name,email,password_hash,plan,credits,monthly_limit,reset_date,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
-            (user_id, name.strip(), email.strip().lower(), _hash_password(password), 'free', FREE_CREDITS, FREE_CREDITS, reset_date, now_iso())
-        )
+        try:
+            c.execute(
+                'INSERT INTO users(id,name,email,password_hash,plan,credits,monthly_limit,reset_date,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                (user_id, name.strip(), normalized_email, _hash_password(password), 'free', FREE_CREDITS, FREE_CREDITS, reset_date, now_iso())
+            )
+        except sqlite3.IntegrityError as exc:
+            if 'users.email' in str(exc).lower() or 'unique constraint failed: users.email' in str(exc).lower():
+                raise ValueError('An account with that email already exists.') from exc
+            raise
     return user_id
 
 

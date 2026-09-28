@@ -15,7 +15,7 @@ CHECK_MODEL = "openai/gpt-oss-120b"
 CHECK_MAX_TOKENS = 3000
 
 EXPECTED_LINES = 8
-MAX_WORDS = 20  # 60s target can require up to 19 words in one of 8 lines
+MAX_WORDS = 14  # prompt asks for under 12; small slack before we reject
 
 SYSTEM_PROMPT = """
 You are an expert viral content writer for TikTok, Instagram Reels,
@@ -33,7 +33,7 @@ RULES:
 - Every line must stand on its own: never refer back to an earlier line
   with words like "those", "that" or "they".
 - End with a call-to-action.
-- Keep each line concise while respecting the requested duration word budget.
+- Keep each line under 12 words.
 
 Output ONLY:
 
@@ -98,19 +98,6 @@ def validate_dialogue(dialogue, strict=True):
     return True, ""
 
 
-def validate_duration(dialogue, duration):
-    duration = int(duration)
-    min_words, max_words = DURATION_WORD_TARGETS[duration]
-    total_words = sum(len(text.split()) for _, text in dialogue)
-    max_line_words = (max_words + len(dialogue) - 1) // len(dialogue)
-    longest = max(len(text.split()) for _, text in dialogue)
-    if total_words < min_words or total_words > max_words:
-        return False, f"{total_words} words, expected {min_words}-{max_words} for {duration}s"
-    if longest > max_line_words:
-        return False, f"a line has {longest} words (limit {max_line_words})"
-    return True, ""
-
-
 def _chat(model, max_tokens, temperature, messages):
     response = client.chat.completions.create(
         model=model,
@@ -125,13 +112,13 @@ def _chat(model, max_tokens, temperature, messages):
     return text
 
 
-def fact_check_dialogue(topic, dialogue, duration=30):
+def fact_check_dialogue(topic, dialogue):
     prompt = (
         "Topic: " + topic + "\n\n"
         "Fact-check this dialogue. Fix factual errors, and replace any claim "
         "you cannot confirm with a safer, well-established fact.\n\n"
         "Requirements:\n"
-        "- Preserve the duration's word budget and concise pacing.\n"
+        "- Do NOT make lines longer. Every line must stay under 12 words.\n"
         "- No hedges, parentheticals or extra clauses.\n"
         "- Keep exactly 8 lines, alternating HOST and GUEST, HOST first.\n"
         "- Every line must stand on its own (no 'those', 'that' or 'they' "
@@ -149,8 +136,6 @@ def fact_check_dialogue(topic, dialogue, duration=30):
         )
         checked = parse_dialogue(text)
         ok, reason = validate_dialogue(checked, strict=True)
-        if ok:
-            ok, reason = validate_duration(checked, duration)
 
         if not ok:
             print("[fact_check] Rejected checked version (" + reason + "); keeping original")
@@ -168,25 +153,12 @@ def fact_check_dialogue(topic, dialogue, duration=30):
         return dialogue
 
 
-DURATION_WORD_TARGETS = {
-    30: (65, 80),
-    45: (95, 115),
-    60: (125, 150),
-}
-
-def generate_script(topic, duration=30):
-    duration = int(duration)
-    if duration not in DURATION_WORD_TARGETS:
-        raise ValueError("duration must be 30, 45, or 60 seconds")
-    min_words, max_words = DURATION_WORD_TARGETS[duration]
+def generate_script(topic):
     user_prompt = (
         "Create a viral HOST/GUEST dialogue.\n\n"
-        "Target duration: " + str(duration) + " seconds.\n"
-        "Target total spoken words: " + str(min_words) + "-" + str(max_words) + ".\n\n"
         "Topic: " + topic + "\n\n"
         "Requirements:\n"
         "- Exactly 8 lines.\n"
-        "- Distribute the target word count naturally across all 8 lines.\n"
         "- Strong hook.\n"
         "- Surprising facts.\n"
         "- Fast pacing.\n"
@@ -208,12 +180,10 @@ def generate_script(topic, duration=30):
             )
             dialogue = parse_dialogue(text)
             ok, reason = validate_dialogue(dialogue, strict)
-            if ok:
-                ok, reason = validate_duration(dialogue, duration)
 
             if ok:
                 print("[script_generator] Generated on attempt " + str(attempt) + " with " + model)
-                dialogue = fact_check_dialogue(topic, dialogue, duration)
+                dialogue = fact_check_dialogue(topic, dialogue)
                 return format_dialogue(dialogue), dialogue
 
             last_error = reason

@@ -17,7 +17,8 @@ let signupMode=true,poll=null;
 const $=id=>document.getElementById(id);
 function setAuthMode(signup){signupMode=signup;$('signupFields').classList.toggle('hidden',!signup);$('authBtn').textContent=signup?'Create account':'Log in';$('switchText').textContent=signup?'Already have an account?':'New to Clip Pirate?';$('switch').textContent=signup?'Log in':'Create account';$('authError').textContent=''}
 $('switch').onclick=()=>setAuthMode(!signupMode);
-async function api(url,opt={}){const r=await fetch(url,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:(d.detail?.message||'Request failed'));return d}
+const API_BASE = window.location.origin;
+async function api(url,opt={}){const target = /^https?:\/\//.test(url) ? url : API_BASE + url; const r=await fetch(target,{credentials:'include',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:(d.detail?.message||'Request failed'));return d}
 async function boot(){try{const d=await api('/auth/me');showApp(d.user)}catch{setAuthMode(true)}}
 function showApp(u){$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('userName').textContent=u.name;$('welcomeName').textContent=u.name.split(' ')[0];$('avatar').textContent=u.name.split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();refreshUser(u);loadProjects()}
 function refreshUser(u){$('credits').textContent=u.credits;$('limit').textContent=u.credit_limit;$('plan').textContent=u.plan==='pro'?'Pro':'Free';$('reset').textContent=u.reset_date;$('creditBar').style.width=Math.max(0,Math.min(100,(u.credits/u.credit_limit)*100))+'%'}
