@@ -1,198 +1,204 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>ShortForge — AI Video Generator</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShortForge — AI Video Dashboard</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-    background: #0f0f14;
-    color: #eaeaf0;
-    display: flex;
-    justify-content: center;
-    padding: 60px 20px;
-    margin: 0;
-  }
-  .card {
-    background: #1a1a22;
-    border-radius: 16px;
-    padding: 32px;
-    max-width: 480px;
-    width: 100%;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-  }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  p.sub { color: #999; margin: 0 0 24px; font-size: 14px; }
-  input {
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 8px;
-    border: 1px solid #333;
-    background: #101015;
-    color: #fff;
-    font-size: 15px;
-    margin-bottom: 12px;
-  }
-  button {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    background: #5b5bf5;
-    color: white;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:disabled { background: #444; cursor: not-allowed; }
-  .status {
-    margin-top: 20px;
-    font-size: 14px;
-    color: #aaa;
-    min-height: 20px;
-  }
-  .status.error { color: #ff6b6b; }
-  .status.done { color: #4ade80; }
-  video {
-    width: 100%;
-    border-radius: 12px;
-    margin-top: 16px;
-    display: none;
-    background: black;
-  }
-  .script-box {
-    margin-top: 16px;
-    font-size: 13px;
-    color: #ccc;
-    background: #101015;
-    border-radius: 8px;
-    padding: 12px;
-    white-space: pre-wrap;
-    display: none;
-  }
-  a.download {
-    display: none;
-    margin-top: 12px;
-    text-align: center;
-    color: #5b5bf5;
-    text-decoration: none;
-    font-size: 14px;
-  }
+*{box-sizing:border-box}
+:root{
+  --bg:#080a14;--panel:#101326;--panel2:#151932;--border:#252b4b;
+  --text:#f5f7ff;--muted:#8f97b7;--purple:#6655ff;--purple2:#8b5cf6;
+  --green:#39d98a;--danger:#ff6b7a;
+}
+body{margin:0;background:radial-gradient(circle at 70% 0%,#16143a 0,#080a14 38%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+button,input,select{font:inherit}
+.app{display:flex;min-height:100vh}
+.sidebar{width:240px;flex:0 0 240px;border-right:1px solid #20253e;background:rgba(9,12,27,.92);padding:22px 15px;display:flex;flex-direction:column}
+.logo{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800;margin:0 12px 34px}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#765cff,#5a45e9);display:grid;place-items:center;box-shadow:0 8px 25px #5d4dff44}
+.logo-mark:after{content:"";margin-left:2px;border-left:11px solid white;border-top:7px solid transparent;border-bottom:7px solid transparent}
+.nav{display:grid;gap:7px}
+.nav button{border:0;background:transparent;color:#aeb5d2;text-align:left;padding:13px 14px;border-radius:11px;cursor:pointer;display:flex;gap:13px;align-items:center;font-weight:600}
+.nav button:hover,.nav button.active{background:linear-gradient(90deg,#4d3bc0,#33287f);color:#fff}
+.nav-icon{width:22px;text-align:center;font-size:18px}
+.sidebar-tip{margin-top:auto;border:1px solid #342c76;background:linear-gradient(145deg,#191647,#11142a);border-radius:14px;padding:18px}
+.sidebar-tip b{display:block;margin-bottom:7px}.sidebar-tip p{color:#9aa2c4;font-size:12px;line-height:1.5;margin:0 0 14px}
+.tip-line{height:4px;width:42px;border-radius:5px;background:#6b5cff}
+.main{flex:1;min-width:0}
+.topbar{height:80px;border-bottom:1px solid #20253e;display:flex;align-items:center;gap:18px;padding:0 30px}
+.search{max-width:470px;width:100%;position:relative}
+.search input{width:100%;height:44px;border:1px solid #2a3153;border-radius:13px;background:#11162b;color:#fff;padding:0 16px 0 43px;outline:none}
+.search input:focus{border-color:#6357ff;box-shadow:0 0 0 3px #6357ff18}
+.search span{position:absolute;left:15px;top:10px;color:#8790b6;font-size:19px}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:20px;color:#aeb5d2}
+.bell{font-size:21px;position:relative}.bell:after{content:"";position:absolute;width:6px;height:6px;border-radius:50%;background:#8b5cf6;right:-2px;top:0}
+.profile{display:flex;align-items:center;gap:10px;font-weight:650}
+.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#754fff,#9a64ff)}
+.content{padding:30px;max-width:1500px;margin:auto}
+.hero{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px}
+.hero h1{font-size:35px;margin:0 0 6px;letter-spacing:-1px}
+.hero h1 span{color:#795cff}.hero p{margin:0;color:#9aa2c4}
+.dashboard-grid{display:grid;grid-template-columns:minmax(0,1fr) 295px;gap:24px}
+.create{border:1px solid #5d50ff;border-radius:17px;padding:24px;background:linear-gradient(145deg,#171941,#0f1226);box-shadow:0 20px 70px #4d42e31b}
+.create-title{display:flex;gap:13px;align-items:center;margin-bottom:20px}
+.magic{width:43px;height:43px;border-radius:12px;background:#4534bd;display:grid;place-items:center;font-size:21px}
+.create h2{font-size:20px;margin:0 0 3px}.create-title p{margin:0;color:#9098b8;font-size:13px}
+label{display:block;color:#bdc4df;font-size:13px;margin-bottom:8px}
+.topic{width:100%;height:48px;border:1px solid #394263;border-radius:11px;background:#171d36;color:#fff;padding:0 15px;outline:none}
+.topic:focus{border-color:#7462ff;box-shadow:0 0 0 3px #7462ff16}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr 110px;gap:12px;margin-top:18px}
+.control select{width:100%;height:44px;border:1px solid #303956;background:#171d36;color:#e9ecfa;border-radius:10px;padding:0 10px;outline:none}
+.toggle-wrap{height:44px;background:#171d36;border:1px solid #303956;border-radius:10px;display:flex;align-items:center;justify-content:space-between;padding:0 10px}
+.switch{width:42px;height:24px;border-radius:30px;background:#3b4261;padding:3px;cursor:pointer}.switch.on{background:#6655ff}.knob{height:18px;width:18px;background:white;border-radius:50%;transition:.2s}.switch.on .knob{transform:translateX(18px)}
+.generate{margin-top:20px;width:100%;height:53px;border:0;border-radius:11px;background:linear-gradient(90deg,#5744f4,#784fff);color:#fff;font-weight:750;cursor:pointer;box-shadow:0 10px 30px #634cff3b}.generate:hover{filter:brightness(1.08)}.generate:disabled{opacity:.55;cursor:not-allowed}
+.credits{border:1px solid #242b4a;border-radius:17px;padding:22px;background:linear-gradient(145deg,#11152b,#0c1020)}
+.credits-head{display:flex;justify-content:space-between;align-items:center}.credits h3{margin:0;font-size:17px}.bolt{background:#382ca5;border-radius:10px;padding:9px}.credit-number{font-size:38px;font-weight:800;margin:24px 0 2px}.credit-number small{font-size:18px;color:#7881a5;font-weight:500}.credits p{margin:0;color:#8f97b7;font-size:12px}
+.progress{height:8px;background:#252c4b;border-radius:8px;margin:15px 0 22px;overflow:hidden}.progress i{display:block;width:48%;height:100%;background:#6655ff;border-radius:8px}
+.upgrade{width:100%;height:45px;border:1px solid #343b61;border-radius:10px;background:#1a2040;color:#d9ddf3;font-weight:650;cursor:pointer;margin-bottom:20px}
+.feature{display:flex;align-items:center;gap:10px;color:#9ea7c7;font-size:13px;margin:14px 0}.check{margin-left:auto;color:#39d98a}.feature-icon{width:25px;height:25px;border-radius:8px;background:#292e56;display:grid;place-items:center;font-size:12px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin:38px 0 15px}.section-head h2{margin:0;font-size:20px}.view{color:#aaa6ff;font-size:13px;cursor:pointer}
+.projects{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
+.project{background:#10152a;border:1px solid #252c4a;border-radius:14px;overflow:hidden;min-width:0}
+.thumb{height:145px;background:linear-gradient(135deg,#222a52,#11152c);position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.thumb:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,#725cff55,transparent 45%)}
+.thumb-text{position:relative;font-size:20px;font-weight:850;text-align:center;letter-spacing:1px}
+.status{position:absolute;right:8px;top:8px;border-radius:20px;padding:5px 9px;font-size:10px;font-weight:750;background:#102c26;color:#45e49a}.status.generating{background:#30247a;color:#b8aaff}
+.duration{position:absolute;right:8px;bottom:7px;background:#090b15cc;padding:3px 6px;border-radius:5px;font-size:10px}
+.project-body{padding:12px}.project-body h3{font-size:13px;margin:0 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.project-body p{font-size:11px;color:#8c94b5;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{display:flex;justify-content:space-between;color:#737c9e;font-size:10px;margin-top:13px}
+.result{margin-top:20px;display:none;border:1px solid #283050;border-radius:14px;background:#0d1224;padding:15px}.result video{width:100%;max-height:420px;border-radius:10px;background:#000;aspect-ratio:4/3}.script{margin-top:12px;background:#11162b;border-radius:10px;padding:12px;color:#b8bfd8;font-size:12px;white-space:pre-wrap;display:none}.download{display:inline-block;margin-top:12px;color:#9d91ff;text-decoration:none;font-size:13px}
+.statusline{margin-top:12px;color:#8f97b7;font-size:12px;min-height:18px}.statusline.error{color:#ff7381}.statusline.done{color:#45e49a}
+.mobile-menu{display:none}
+@media(max-width:1100px){.projects{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr 1fr}.dashboard-grid{grid-template-columns:1fr}.credits{display:none}}
+@media(max-width:760px){.sidebar{display:none}.mobile-menu{display:block}.topbar{padding:0 15px}.content{padding:20px 15px}.hero{align-items:flex-start}.hero h1{font-size:28px}.controls{grid-template-columns:1fr}.projects{grid-template-columns:1fr}.search{max-width:none}.profile span{display:none}}
 </style>
 </head>
 <body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-mark"></div>ShortForge</div>
+    <nav class="nav">
+      <button class="active"><span class="nav-icon">⌂</span>Dashboard</button>
+      <button onclick="focusCreate()"><span class="nav-icon">⊕</span>Create Video</button>
+      <button><span class="nav-icon">▢</span>Projects</button>
+      <button><span class="nav-icon">▦</span>Templates</button>
+      <button><span class="nav-icon">▥</span>Analytics</button>
+      <button><span class="nav-icon">⚙</span>Settings</button>
+    </nav>
+    <div class="sidebar-tip"><b>✦ Turn ideas into viral videos</b><p>Create engaging short-form videos with AI.</p><div class="tip-line"></div></div>
+  </aside>
 
-<div class="card">
-  <h1>ShortForge</h1>
-  <p class="sub">Generate a short-form AI video from any topic.</p>
+  <main class="main">
+    <header class="topbar">
+      <button class="mobile-menu" onclick="document.querySelector('.sidebar').style.display='flex'">☰</button>
+      <div class="search"><span>⌕</span><input id="search" placeholder="Search projects, templates..." /></div>
+      <div class="top-actions"><span class="bell">♧</span><div class="profile"><div class="avatar">JD</div><span>John Doe</span>⌄</div></div>
+    </header>
 
-  <input id="topic" type="text" placeholder="e.g. black holes, stoicism, cristiano ronaldo" />
-  <button id="generateBtn">Generate video</button>
+    <section class="content">
+      <div class="hero"><div><h1>Welcome back, <span>John!</span></h1><p>Create amazing short-form videos with AI. Turn your ideas into engaging content in minutes.</p></div></div>
 
-  <div id="status" class="status"></div>
-  <div id="scriptBox" class="script-box"></div>
-  <video id="video" controls></video>
-  <a id="downloadLink" class="download" download>Download video</a>
+      <div class="dashboard-grid">
+        <div>
+          <section class="create" id="createPanel">
+            <div class="create-title"><div class="magic">✣</div><div><h2>Create a new video</h2><p>Enter a topic and customize your settings. Our AI will handle the rest.</p></div></div>
+            <label for="topic">Topic</label>
+            <input class="topic" id="topic" type="text" placeholder="e.g. black holes, stoicism, cristiano ronaldo" />
+            <div class="controls">
+              <div class="control"><label>Duration</label><select id="duration"><option>30 seconds</option><option>45 seconds</option><option>60 seconds</option></select></div>
+              <div class="control"><label>Aspect Ratio</label><select id="ratio"><option selected>4:3</option><option>9:16 (Vertical)</option><option>16:9 (Landscape)</option><option>1:1 (Square)</option></select></div>
+              <div class="control"><label>Voice</label><select id="voice"><option>Professional</option><option>Energetic</option><option>Calm</option></select></div>
+              <div class="control"><label>Captions</label><div class="toggle-wrap"><span>CC</span><div id="switch" class="switch on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div></div>
+            </div>
+            <button class="generate" id="generateBtn">✦ Generate Video　›</button>
+            <div id="status" class="statusline"></div>
+            <div class="result" id="result">
+              <video id="video" controls></video>
+              <div class="script" id="scriptBox"></div>
+              <a class="download" id="downloadLink" download>Download video</a>
+            </div>
+          </section>
+
+          <div class="section-head"><h2>Recent Projects</h2><span class="view">View All　→</span></div>
+          <div class="projects" id="projects">
+            <article class="project"><div class="thumb"><span class="status">● Completed</span><div class="thumb-text">THE NEXT<br>FRONTIER</div><span class="duration">0:28</span></div><div class="project-body"><h3>Elon Musk - The Next Frontier</h3><p>A look at his vision for the future</p><div class="meta"><span>▣ Apr 27, 2025</span><span>◷ 28s</span></div></div></article>
+            <article class="project"><div class="thumb"><span class="status">● Completed</span><div class="thumb-text">🚀</div><span class="duration">0:32</span></div><div class="project-body"><h3>SpaceX Milestones</h3><p>Key moments in space exploration</p><div class="meta"><span>▣ Apr 26, 2025</span><span>◷ 32s</span></div></div></article>
+            <article class="project"><div class="thumb"><span class="status generating">✦ Generating</span><div class="thumb-text">CYBER<br>CAR</div><span class="duration">0:25</span></div><div class="project-body"><h3>The Future of Electric Cars</h3><p>Innovation. Sustainability. Tomorrow.</p><div class="meta"><span>▣ Apr 25, 2025</span><span>◷ 25s</span></div></div></article>
+            <article class="project"><div class="thumb"><span class="status">● Completed</span><div class="thumb-text">AI +<br>HUMANITY</div><span class="duration">0:41</span></div><div class="project-body"><h3>AI and Humanity</h3><p>A new chapter together</p><div class="meta"><span>▣ Apr 24, 2025</span><span>◷ 41s</span></div></div></article>
+          </div>
+        </div>
+
+        <aside class="credits">
+          <div class="credits-head"><h3>⚡ Your Credits</h3><span>ⓘ</span></div>
+          <div class="credit-number">24 <small>/ 50</small></div><p>videos this month</p>
+          <div class="progress"><i></i></div>
+          <button class="upgrade">♛　Upgrade Plan　›</button>
+          <div class="feature"><span class="feature-icon">▣</span>Standard Quality <b class="check">✓</b></div>
+          <div class="feature"><span class="feature-icon">HD</span>HD Rendering <b class="check">✓</b></div>
+          <div class="feature"><span class="feature-icon">⚡</span>Priority Generation <b>○</b></div>
+        </aside>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
-  const API_BASE = window.location.origin;
+const API_BASE = window.location.origin;
+const topicInput = document.getElementById("topic");
+const generateBtn = document.getElementById("generateBtn");
+const statusEl = document.getElementById("status");
+const result = document.getElementById("result");
+const scriptBox = document.getElementById("scriptBox");
+const videoEl = document.getElementById("video");
+const downloadLink = document.getElementById("downloadLink");
+let pollTimer = null;
 
-  const topicInput = document.getElementById("topic");
-  const generateBtn = document.getElementById("generateBtn");
-  const statusEl = document.getElementById("status");
-  const scriptBox = document.getElementById("scriptBox");
-  const videoEl = document.getElementById("video");
-  const downloadLink = document.getElementById("downloadLink");
+function setStatus(text,type=""){statusEl.textContent=text;statusEl.className="statusline "+type}
+function focusCreate(){document.getElementById("createPanel").scrollIntoView({behavior:"smooth"});topicInput.focus()}
 
-  let pollTimer = null;
-
-  function setStatus(text, type = "") {
-    statusEl.textContent = text;
-    statusEl.className = "status " + type;
-  }
-
-  async function generateVideo() {
-    const topic = topicInput.value.trim();
-    if (!topic) {
-      setStatus("Please enter a topic.", "error");
-      return;
-    }
-
-    generateBtn.disabled = true;
-    videoEl.style.display = "none";
-    scriptBox.style.display = "none";
-    downloadLink.style.display = "none";
-    setStatus("Submitting job...");
-
-    try {
-      const res = await fetch(`${API_BASE}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || err.error || `Request failed (${res.status})`);
-      }
-
-      const data = await res.json();
-      setStatus("Job queued — generating script, audio, and video...");
-      pollStatus(data.job_id);
-    } catch (e) {
-      setStatus(`Error: ${e.message}`, "error");
-      generateBtn.disabled = false;
-    }
-  }
-
-  function pollStatus(jobId) {
-  pollTimer = setInterval(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/status/${jobId}`);
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Status check failed (${res.status})`);
-      }
-
-      const data = await res.json();
-
-      if (data.status === "completed") {
-        clearInterval(pollTimer);
-        setStatus("Done!", "done");
-        generateBtn.disabled = false;
-
-        scriptBox.textContent = data.script;
-        scriptBox.style.display = "block";
-
-        const videoUrl = `${API_BASE}${data.download_url}`;
-        videoEl.src = videoUrl;
-        videoEl.style.display = "block";
-
-        downloadLink.href = videoUrl;
-        downloadLink.style.display = "block";
-      } else if (data.status === "failed") {
-        clearInterval(pollTimer);
-        setStatus(`Failed: ${data.error}`, "error");
-        generateBtn.disabled = false;
-      } else {
-        setStatus(`Status: ${data.status}...`);
-      }
-    } catch (e) {
-      clearInterval(pollTimer);
-      setStatus(`Error checking status: ${e.message}`, "error");
-      generateBtn.disabled = false;
-    }
-  }, 3000);
+async function generateVideo(){
+  const topic=topicInput.value.trim();
+  if(!topic){setStatus("Please enter a topic.","error");topicInput.focus();return}
+  if(pollTimer) clearInterval(pollTimer);
+  generateBtn.disabled=true;
+  result.style.display="none";scriptBox.style.display="none";downloadLink.style.display="none";
+  setStatus("Submitting job...");
+  try{
+    /* Keep the existing backend contract intact: the current API accepts { topic }. */
+    const res=await fetch(`${API_BASE}/generate`,{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic})
+    });
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||err.error||`Request failed (${res.status})`)}
+    const data=await res.json();
+    setStatus("Job queued — generating script, audio, and video...");
+    pollStatus(data.job_id);
+  }catch(e){setStatus(`Error: ${e.message}`,"error");generateBtn.disabled=false}
 }
+function pollStatus(jobId){
+  pollTimer=setInterval(async()=>{
+    try{
+      const res=await fetch(`${API_BASE}/status/${jobId}`);
+      if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.detail||`Status check failed (${res.status})`)}
+      const data=await res.json();
+      if(data.status==="completed"){
+        clearInterval(pollTimer);generateBtn.disabled=false;setStatus("Video ready!","done");
+        scriptBox.textContent=data.script||"";scriptBox.style.display=data.script?"block":"none";
+        const videoUrl=`${API_BASE}${data.download_url}`;
+        videoEl.src=videoUrl;videoEl.style.display="block";result.style.display="block";
+        downloadLink.href=videoUrl;downloadLink.style.display="inline-block";
+      }else if(data.status==="failed"){
+        clearInterval(pollTimer);generateBtn.disabled=false;setStatus(`Failed: ${data.error||"Unknown error"}`,"error")
+      }else setStatus(`Status: ${data.status}...`);
+    }catch(e){clearInterval(pollTimer);generateBtn.disabled=false;setStatus(`Error checking status: ${e.message}`,"error")}
+  },3000)
+}
+generateBtn.addEventListener("click",generateVideo);
+topicInput.addEventListener("keydown",e=>{if(e.key==="Enter")generateVideo()});
 
-  generateBtn.addEventListener("click", generateVideo);
-  topicInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") generateVideo();
-  });
+document.getElementById("search").addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase();
+  document.querySelectorAll(".project").forEach(p=>p.style.display=p.innerText.toLowerCase().includes(q)?"":"none")
+});
 </script>
-
 </body>
 </html>
