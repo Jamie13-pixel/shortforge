@@ -89,4 +89,6 @@ MAX_LINES = 8
 MAX_WORDS_PER_LINE = 12
 
 LINE_PATTERN = re.compile(
-    r"^[\\s>*_#\\-]*(HOST|GUEST)[\\s*_]*:[\\s*_
+    r"^[\s>*_#\-]*(HOST|GUEST)[\s*_]*:[\s*_]*(.+)$",
+    re.IGNORECASE,
+)
