@@ -7,11 +7,19 @@ from google import genai
 from google.genai import types
 
 
+# ============================================================
+# GEMINI CONFIGURATION
+# ============================================================
+
 DEFAULT_MODEL = os.getenv(
     "GEMINI_MODEL",
     "gemini-3.8-flash"
 )
 
+
+# ============================================================
+# GEMINI CLIENT
+# ============================================================
 
 def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
@@ -26,7 +34,12 @@ def get_gemini_client():
     return genai.Client(api_key=api_key)
 
 
+# ============================================================
+# WORD COUNT
+# ============================================================
+
 def target_word_count(duration: int) -> int:
+
     if duration == 30:
         return 70
 
@@ -41,12 +54,18 @@ def target_word_count(duration: int) -> int:
     )
 
 
+# ============================================================
+# CLEAN GEMINI RESPONSE
+# ============================================================
+
 def clean_response(text: str) -> str:
+
     if not text:
         return ""
 
     text = text.strip()
 
+    # Remove markdown JSON fences if Gemini adds them
     text = re.sub(
         r"^```(?:json)?\s*",
         "",
@@ -64,53 +83,86 @@ def clean_response(text: str) -> str:
     return text.strip()
 
 
+# ============================================================
+# EXTRACT JSON
+# ============================================================
+
 def extract_json(text: str):
+
     text = clean_response(text)
 
+    # Try direct JSON first
     try:
         return json.loads(text)
 
     except json.JSONDecodeError:
         pass
 
+    # Try extracting JSON object from surrounding text
     start = text.find("{")
     end = text.rfind("}")
 
     if start == -1 or end == -1 or end <= start:
+
         raise RuntimeError(
             "Gemini returned an invalid script response."
         )
 
     try:
+
         return json.loads(
             text[start:end + 1]
         )
 
     except json.JSONDecodeError as exc:
+
         raise RuntimeError(
             "Gemini returned invalid JSON for the video script."
         ) from exc
 
 
+# ============================================================
+# GENERATE SCRIPT
+# ============================================================
+
 def generate_script(
     topic: str,
     duration: int = 30
 ):
+
+    # --------------------------------------------------------
+    # Validate topic
+    # --------------------------------------------------------
+
     if not topic or not topic.strip():
+
         raise ValueError(
             "Video topic cannot be empty."
         )
 
     topic = topic.strip()
 
+    # --------------------------------------------------------
+    # Validate duration
+    # --------------------------------------------------------
+
     if duration not in (30, 45, 60):
+
         raise ValueError(
             "Duration must be 30, 45, or 60 seconds."
         )
 
     word_count = target_word_count(duration)
 
+    # --------------------------------------------------------
+    # Create Gemini client
+    # --------------------------------------------------------
+
     client = get_gemini_client()
+
+    # --------------------------------------------------------
+    # Prompt
+    # --------------------------------------------------------
 
     prompt = f"""
 You are the professional script-writing engine for
@@ -159,70 +211,131 @@ Use exactly this structure:
 }}
 """
 
-    max_retries = 3
+    # --------------------------------------------------------
+    # Retry configuration
+    # --------------------------------------------------------
+
+    max_retries = 6
+
     response = None
 
+    # --------------------------------------------------------
+    # Gemini request
+    # --------------------------------------------------------
+
     for attempt in range(max_retries):
+
         try:
+
             response = client.models.generate_content(
                 model=DEFAULT_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.8,
                     max_output_tokens=500
                 )
             )
 
+            # Successful request
             break
 
         except Exception as exc:
+
             error_text = str(exc)
 
+            # ------------------------------------------------
             # Gemini temporarily unavailable
-            if "503" in error_text or "UNAVAILABLE" in error_text:
+            # ------------------------------------------------
+
+            if (
+                "503" in error_text
+                or "UNAVAILABLE" in error_text
+                or "high demand" in error_text.lower()
+            ):
 
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
+
+                    # 1, 2, 4, 8, 16 seconds
+                    wait_time = min(
+                        2 ** attempt,
+                        30
+                    )
+
                     time.sleep(wait_time)
+
                     continue
 
                 raise RuntimeError(
-                    "Gemini is temporarily unavailable after "
-                    "several retry attempts. Please try again."
+                    "Gemini is currently experiencing high demand. "
+                    "Please wait a little while and try generating again."
                 ) from exc
 
+            # ------------------------------------------------
             # Rate limit / quota
-            if "429" in error_text:
+            # ------------------------------------------------
+
+            if (
+                "429" in error_text
+                or "RESOURCE_EXHAUSTED" in error_text
+            ):
 
                 raise RuntimeError(
                     "Gemini API rate limit or quota reached. "
                     "Please try again later."
                 ) from exc
 
+            # ------------------------------------------------
             # Authentication
-            if "401" in error_text or "403" in error_text:
+            # ------------------------------------------------
+
+            if (
+                "401" in error_text
+                or "403" in error_text
+                or "UNAUTHENTICATED" in error_text
+                or "PERMISSION_DENIED" in error_text
+            ):
 
                 raise RuntimeError(
                     "Gemini API authentication failed. "
                     "Check your GEMINI_API_KEY."
                 ) from exc
 
+            # ------------------------------------------------
             # Model not available
-            if "404" in error_text or "NOT_FOUND" in error_text:
+            # ------------------------------------------------
+
+            if (
+                "404" in error_text
+                or "NOT_FOUND" in error_text
+            ):
 
                 raise RuntimeError(
-                    f"Gemini model '{DEFAULT_MODEL}' is not available. "
+                    f"Gemini model '{DEFAULT_MODEL}' "
+                    "is not available. "
                     "Check the GEMINI_MODEL environment variable."
                 ) from exc
 
+            # ------------------------------------------------
+            # Other Gemini errors
+            # ------------------------------------------------
+
             raise RuntimeError(
-                f"Gemini script generation failed: {error_text}"
+                f"Gemini script generation failed: "
+                f"{error_text}"
             ) from exc
 
+    # ========================================================
+    # Make sure a response was received
+    # ========================================================
+
     if response is None:
+
         raise RuntimeError(
             "Gemini did not return a response."
         )
+
+    # ========================================================
+    # Get response text
+    # ========================================================
 
     content = getattr(
         response,
@@ -231,25 +344,43 @@ Use exactly this structure:
     )
 
     if not content:
+
         raise RuntimeError(
             "Gemini returned an empty script."
         )
 
+    # ========================================================
+    # Parse JSON
+    # ========================================================
+
     data = extract_json(content)
 
     if not isinstance(data, dict):
+
         raise RuntimeError(
             "Gemini returned an invalid script structure."
         )
 
+    # ========================================================
+    # Extract script
+    # ========================================================
+
     script_text = str(
-        data.get("script", "")
+        data.get(
+            "script",
+            ""
+        )
     ).strip()
 
     if not script_text:
+
         raise RuntimeError(
             "Gemini returned no script text."
         )
+
+    # ========================================================
+    # Extract dialogue
+    # ========================================================
 
     dialogue = data.get(
         "dialogue",
@@ -257,10 +388,12 @@ Use exactly this structure:
     )
 
     if not isinstance(dialogue, list):
+
         raise RuntimeError(
             "Gemini returned an invalid dialogue format."
         )
 
+    # Clean dialogue sentences
     dialogue = [
         str(sentence).strip()
         for sentence in dialogue
@@ -268,8 +401,13 @@ Use exactly this structure:
     ]
 
     if not dialogue:
+
         raise RuntimeError(
             "Gemini returned no dialogue."
         )
+
+    # ========================================================
+    # Return result
+    # ========================================================
 
     return script_text, dialogue
