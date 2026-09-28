@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 
 from google import genai
 from google.genai import types
@@ -156,17 +157,62 @@ Use exactly this structure:
 }}
 """
 
-    try:
-        response = client.models.generate_content(
-            model=DEFAULT_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.8,
-                max_output_tokens=500
-            )
-        )
+        max_retries = 3
+    response = None
 
-    except Exception as exc:
+    for attempt in range(max_retries):
+
+        try:
+            response = client.models.generate_content(
+                model=DEFAULT_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.8,
+                    max_output_tokens=500
+                )
+            )
+
+            break
+
+        except Exception as exc:
+
+            error_text = str(exc)
+
+            # Gemini temporarily unavailable
+            if "503" in error_text or "UNAVAILABLE" in error_text:
+
+                if attempt < max_retries - 1:
+
+                    wait_time = 2 ** attempt
+
+                    time.sleep(wait_time)
+
+                    continue
+
+                raise RuntimeError(
+                    "Gemini is temporarily unavailable after "
+                    "several retry attempts. Please try again."
+                ) from exc
+
+            # Rate limit / quota
+            if "429" in error_text:
+
+                raise RuntimeError(
+                    "Gemini API rate limit or quota reached. "
+                    "Please try again later."
+                ) from exc
+
+            # Authentication
+            if "401" in error_text or "403" in error_text:
+
+                raise RuntimeError(
+                    "Gemini API authentication failed. "
+                    "Check your GEMINI_API_KEY."
+                ) from exc
+
+            raise RuntimeError(
+                f"Gemini script generation failed: {error_text}"
+            ) from exc
         error_text = str(exc)
 
         if "429" in error_text:
