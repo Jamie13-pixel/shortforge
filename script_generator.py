@@ -13,54 +13,16 @@ and YouTube Shorts.
 
 Create a highly engaging dialogue between HOST and GUEST.
 
-GOAL:
-Make viewers stay until the final second.
-
 RULES:
 
-1. Exactly 8 dialogue lines.
+- Exactly 8 dialogue lines.
+- Alternate HOST and GUEST.
+- First line must be a strong hook.
+- Include surprising facts.
+- End with a call-to-action.
+- Keep each line under 12 words.
 
-2. Alternate speakers exactly:
-
-HOST
-GUEST
-HOST
-GUEST
-HOST
-GUEST
-HOST
-GUEST
-
-3. Structure:
-
-Line 1:
-A shocking or curiosity-driven hook.
-
-Lines 2-3:
-Build curiosity.
-
-Lines 4-6:
-Reveal surprising facts or insights.
-
-Lines 7-8:
-Strong payoff and call-to-action.
-
-4. Every line must add new information.
-
-5. Avoid filler:
-- Wow
-- Really
-- Amazing
-- Interesting
-- That's crazy
-
-6. Fast-paced conversational style.
-
-7. Keep each line under 12 words.
-
-8. Use real facts whenever possible.
-
-OUTPUT FORMAT:
+Output ONLY:
 
 HOST: text
 GUEST: text
@@ -70,25 +32,136 @@ HOST: text
 GUEST: text
 HOST: text
 GUEST: text
-
-No markdown.
-No narration.
-No stage directions.
-No extra text.
 """
-
-ATTEMPTS = [
-    ("openai/gpt-oss-20b", 1500),
-    ("openai/gpt-oss-20b", 3000),
-    ("openai/gpt-oss-120b", 3000),
-]
-
-MIN_LINES_STRICT = 8
-MIN_LINES_LENIENT = 6
-MAX_LINES = 8
-MAX_WORDS_PER_LINE = 12
 
 LINE_PATTERN = re.compile(
     r"^[\s>*_#\-]*(HOST|GUEST)[\s*_]*:[\s*_]*(.+)$",
     re.IGNORECASE,
 )
+
+
+class ScriptGenerationError(Exception):
+    pass
+
+
+def parse_dialogue(raw_text):
+    dialogue = []
+
+    for line in raw_text.splitlines():
+        match = LINE_PATTERN.match(line)
+
+        if match:
+            speaker = match.group(1).upper()
+            text = match.group(2).strip()
+
+            if text:
+                dialogue.append((speaker, text))
+
+    return dialogue
+
+
+def fact_check_dialogue(topic, dialogue):
+    script_text = "\n".join(
+        f"{speaker}: {text}"
+        for speaker, text in dialogue
+    )
+
+    prompt = f"""
+Topic: {topic}
+
+Fact-check and improve this dialogue.
+
+Requirements:
+- Keep HOST/GUEST format.
+- Keep 8 lines.
+- Correct factual errors.
+- Improve weak lines.
+- Return dialogue only.
+
+{script_text}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            temperature=0.2,
+            max_tokens=1000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        content = response.choices[0].message.content
+
+        if content:
+            checked = parse_dialogue(content)
+
+            if checked:
+                return checked
+
+    except Exception as e:
+        print("[fact_check]", e)
+
+    return dialogue
+
+
+def generate_script(topic):
+
+    user_prompt = f"""
+Create a viral HOST/GUEST dialogue.
+
+Topic: {topic}
+
+Requirements:
+- Exactly 8 lines.
+- Strong hook.
+- Surprising facts.
+- Fast pacing.
+- Strong ending.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            temperature=1.0,
+            max_tokens=1500,
+            messages=[
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt,
+                },
+            ],
+        )
+
+        text = response.choices[0].message.content.strip()
+
+        dialogue = parse_dialogue(text)
+
+        if not dialogue:
+            raise ScriptGenerationError(
+                "Failed to parse HOST/GUEST dialogue"
+            )
+
+        dialogue = fact_check_dialogue(
+            topic,
+            dialogue
+        )
+
+        clean_text = "\n".join(
+            f"{speaker}: {line}"
+            for speaker, line in dialogue
+        )
+
+        return clean_text, dialogue
+
+    except Exception as e:
+        raise ScriptGenerationError(
+            f"Script generation failed: {e}"
+        )
