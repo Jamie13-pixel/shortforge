@@ -323,6 +323,36 @@ async def root():
 
     index_file = STATIC_DIR / "index.html"
 
+# Frontend dashboard/pages
+@app.get("/dashboard")
+async def dashboard():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/projects")
+async def projects_page():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/create-video")
+async def create_video_page():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/templates")
+async def templates_page():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/analytics")
+async def analytics_page():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/settings")
+async def settings_page():
+    return FileResponse(STATIC_DIR / "index.html")
+
     if not index_file.exists():
 
         raise HTTPException(
