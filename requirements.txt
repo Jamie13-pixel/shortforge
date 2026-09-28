@@ -8,3 +8,4 @@ moviepy
 pillow
 slowapi
 edge-tts
+email-validator
