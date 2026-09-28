@@ -9,3 +9,4 @@ pillow
 slowapi
 edge-tts
 email-validator
+openai
