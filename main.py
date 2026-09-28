@@ -7,7 +7,6 @@ import re
 import traceback
 import uuid
 import sqlite3
-from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -60,7 +59,7 @@ from db import (
 
 
 # ============================================================
-# APP CONFIGURATION
+# CLIP PIRATE .AI CONFIGURATION
 # ============================================================
 
 APP_NAME = "Clip Pirate .ai"
@@ -76,7 +75,10 @@ AUDIO_DIR = DATA_DIR / "audio"
 TEMP_CLIPS_DIR = DATA_DIR / "temp_clips"
 
 
-# Create required directories.
+# ============================================================
+# CREATE REQUIRED DIRECTORIES
+# ============================================================
+
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,28 +86,22 @@ TEMP_CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================
-# FASTAPI
+# FASTAPI APPLICATION
 # ============================================================
 
 app = FastAPI(title=APP_NAME)
 
 app.state.limiter = limiter
+
 app.add_exception_handler(
     RateLimitExceeded,
-    _rate_limit_exceeded_handler
+    _rate_limit_exceeded_handler,
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # CORS
-# ------------------------------------------------------------
-#
-# The dashboard is served by this same FastAPI application.
-# Keeping CORS permissive here also allows local development.
-#
-# For production, you can restrict allow_origins to your
-# actual frontend domain.
-# ------------------------------------------------------------
+# ============================================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -134,7 +130,7 @@ app.mount(
 
 
 # ============================================================
-# DATABASE INITIALIZATION
+# DATABASE
 # ============================================================
 
 init_db()
@@ -147,14 +143,14 @@ init_db()
 class SignupRequest(BaseModel):
     name: str = Field(
         min_length=2,
-        max_length=80
+        max_length=80,
     )
 
     email: EmailStr
 
     password: str = Field(
         min_length=8,
-        max_length=128
+        max_length=128,
     )
 
 
@@ -166,59 +162,67 @@ class LoginRequest(BaseModel):
 class VideoRequest(BaseModel):
     topic: str = Field(
         min_length=1,
-        max_length=300
+        max_length=300,
     )
 
     duration: int = Field(
         default=30,
         ge=30,
-        le=60
+        le=60,
     )
 
     aspect_ratio: str = Field(
-        default="4:3"
+        default="4:3",
     )
 
     voice: str = Field(
-        default="professional"
+        default="professional",
     )
 
     captions: bool = True
 
 
 # ============================================================
-# HELPERS
+# HELPER FUNCTIONS
 # ============================================================
 
 def normalize_email(email: str) -> str:
     """
-    Normalize email addresses so the same account cannot be
-    created using different capitalization or surrounding spaces.
+    Normalize email addresses so that:
+
+    User@example.com
+    user@example.com
+    USER@EXAMPLE.COM
+
+    are treated as the same email.
     """
+
     return email.strip().lower()
 
 
 def current_user(request: Request):
     """
-    Return the authenticated user.
-
-    Raises HTTP 401 if there is no valid session.
+    Get the currently authenticated user.
     """
 
-    session_token = request.cookies.get(SESSION_COOKIE)
+    session_token = request.cookies.get(
+        SESSION_COOKIE
+    )
 
     if not session_token:
         raise HTTPException(
             status_code=401,
-            detail="Please log in to continue."
+            detail="Please log in to continue.",
         )
 
-    user = get_user_by_session(session_token)
+    user = get_user_by_session(
+        session_token
+    )
 
     if not user:
         raise HTTPException(
             status_code=401,
-            detail="Your session has expired. Please log in again."
+            detail="Your session has expired. Please log in again.",
         )
 
     return user
@@ -226,13 +230,13 @@ def current_user(request: Request):
 
 def safe_filename(topic: str) -> str:
     """
-    Create a safe filename from the video topic.
+    Convert a topic into a safe video filename.
     """
 
     slug = re.sub(
         r"[^a-zA-Z0-9_-]+",
         "-",
-        topic.strip()
+        topic.strip(),
     ).strip("-").lower()
 
     return f"{slug or 'video'}-{uuid.uuid4().hex[:8]}"
@@ -240,11 +244,11 @@ def safe_filename(topic: str) -> str:
 
 def credit_cost(duration: int) -> int:
     """
-    Clip Pirate credit pricing.
+    Credit cost based on requested video duration.
 
-    30 seconds -> 1 credit
-    45 seconds -> 2 credits
-    60 seconds -> 3 credits
+    30 seconds = 1 credit
+    45 seconds = 2 credits
+    60 seconds = 3 credits
     """
 
     if duration <= 30:
@@ -268,7 +272,7 @@ def normalize_ratio(ratio: str) -> str:
     if ratio not in allowed:
         raise HTTPException(
             status_code=422,
-            detail="Unsupported aspect ratio."
+            detail="Unsupported aspect ratio.",
         )
 
     return ratio
@@ -285,28 +289,20 @@ def normalize_voice(voice: str) -> str:
     if voice not in allowed:
         raise HTTPException(
             status_code=422,
-            detail="Unsupported voice."
+            detail="Unsupported voice.",
         )
 
     return voice
 
 
 def cookie_settings():
-    """
-    Cookie configuration.
-
-    For local HTTP development:
-        SECURE_COOKIE=false
-
-    For HTTPS production:
-        SECURE_COOKIE=true
-    """
 
     secure_cookie = (
         os.getenv(
             "SECURE_COOKIE",
-            "false"
-        ).lower() == "true"
+            "false",
+        ).lower()
+        == "true"
     )
 
     return {
@@ -319,7 +315,7 @@ def cookie_settings():
 
 
 # ============================================================
-# FRONTEND
+# HOME / FRONTEND
 # ============================================================
 
 @app.get("/")
@@ -328,12 +324,13 @@ async def root():
     index_file = STATIC_DIR / "index.html"
 
     if not index_file.exists():
+
         raise HTTPException(
             status_code=500,
             detail=(
                 "Clip Pirate frontend is missing. "
-                "Expected static/index.html."
-            )
+                "Expected: static/index.html"
+            ),
         )
 
     return FileResponse(
@@ -342,7 +339,7 @@ async def root():
 
 
 # ============================================================
-# AUTHENTICATION
+# AUTH HEALTH CHECK
 # ============================================================
 
 @app.get("/auth/health")
@@ -354,6 +351,10 @@ def auth_health():
     }
 
 
+# ============================================================
+# SIGN UP
+# ============================================================
+
 @app.post("/auth/signup")
 def signup(
     body: SignupRequest,
@@ -361,29 +362,35 @@ def signup(
 ):
 
     name = body.name.strip()
-    email = normalize_email(str(body.email))
+
+    email = normalize_email(
+        str(body.email)
+    )
 
     if not name:
+
         raise HTTPException(
             status_code=422,
-            detail="Name cannot be empty."
+            detail="Name cannot be empty.",
         )
 
     # --------------------------------------------------------
-    # Check for existing account.
+    # PREVENT DUPLICATE EMAIL ACCOUNTS
     # --------------------------------------------------------
 
-    existing_user = get_user_by_email(email)
+    existing_user = get_user_by_email(
+        email
+    )
 
     if existing_user:
 
         raise HTTPException(
             status_code=409,
-            detail="An account with that email already exists."
+            detail="Email already exists.",
         )
 
     # --------------------------------------------------------
-    # Create user.
+    # CREATE USER
     # --------------------------------------------------------
 
     try:
@@ -394,41 +401,46 @@ def signup(
             body.password,
         )
 
-    except ValueError as exc:
+    except ValueError:
 
         raise HTTPException(
             status_code=409,
-            detail=str(exc),
-        ) from exc
+            detail="Email already exists.",
+        )
 
     except sqlite3.IntegrityError:
 
-        # Database UNIQUE constraint is the final protection
-        # against duplicate accounts.
-
         raise HTTPException(
             status_code=409,
-            detail="An account with that email already exists."
+            detail="Email already exists.",
         )
 
     # --------------------------------------------------------
-    # Automatically log the user in after signup.
+    # CREATE SESSION
     # --------------------------------------------------------
 
-    token = create_session(user_id)
+    token = create_session(
+        user_id
+    )
 
     response.set_cookie(
         SESSION_COOKIE,
         token,
-        **cookie_settings()
+        **cookie_settings(),
     )
 
-    user = get_user(user_id)
+    user = get_user(
+        user_id
+    )
 
     return {
         "user": public_user(user)
     }
 
+
+# ============================================================
+# LOGIN
+# ============================================================
 
 @app.post("/auth/login")
 def login(
@@ -436,25 +448,29 @@ def login(
     response: Response,
 ):
 
-    email = normalize_email(str(body.email))
+    email = normalize_email(
+        str(body.email)
+    )
 
-    user = get_user_by_email(email)
+    user = get_user_by_email(
+        email
+    )
 
     if not user:
 
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password."
+            detail="Invalid email or password.",
         )
 
     if not verify_password(
         body.password,
-        user["password_hash"]
+        user["password_hash"],
     ):
 
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password."
+            detail="Invalid email or password.",
         )
 
     token = create_session(
@@ -464,7 +480,7 @@ def login(
     response.set_cookie(
         SESSION_COOKIE,
         token,
-        **cookie_settings()
+        **cookie_settings(),
     )
 
     return {
@@ -474,9 +490,9 @@ def login(
     }
 
 
-# ------------------------------------------------------------
-# Compatibility authentication routes.
-# ------------------------------------------------------------
+# ============================================================
+# COMPATIBILITY AUTH ROUTES
+# ============================================================
 
 @app.post("/signup")
 def signup_alias(
@@ -486,7 +502,7 @@ def signup_alias(
 
     return signup(
         body,
-        response
+        response,
     )
 
 
@@ -498,9 +514,13 @@ def login_alias(
 
     return login(
         body,
-        response
+        response,
     )
 
+
+# ============================================================
+# LOGOUT
+# ============================================================
 
 @app.post("/auth/logout")
 def logout(
@@ -517,7 +537,7 @@ def logout(
 
     response.delete_cookie(
         SESSION_COOKIE,
-        path="/"
+        path="/",
     )
 
     return {
@@ -525,12 +545,18 @@ def logout(
     }
 
 
+# ============================================================
+# CURRENT USER
+# ============================================================
+
 @app.get("/auth/me")
 def me(
     request: Request,
 ):
 
-    user = current_user(request)
+    user = current_user(
+        request
+    )
 
     return {
         "user": public_user(user)
@@ -538,7 +564,7 @@ def me(
 
 
 # ============================================================
-# USER DATA
+# CREDITS
 # ============================================================
 
 @app.get("/credits")
@@ -546,19 +572,27 @@ def credits(
     request: Request,
 ):
 
-    user = current_user(request)
+    user = current_user(
+        request
+    )
 
     return {
         "user": public_user(user)
     }
 
 
+# ============================================================
+# PROJECTS
+# ============================================================
+
 @app.get("/projects")
 def projects(
     request: Request,
 ):
 
-    user = current_user(request)
+    user = current_user(
+        request
+    )
 
     rows = list_projects(
         user["id"]
@@ -573,7 +607,7 @@ def projects(
 
 
 # ============================================================
-# VIDEO GENERATION
+# VIDEO GENERATION WORKER
 # ============================================================
 
 async def process_video_job(
@@ -586,17 +620,21 @@ async def process_video_job(
 
     set_status(
         job_id,
-        JobStatus.PROCESSING
+        JobStatus.PROCESSING,
     )
 
-    file_stem = safe_filename(topic)
+    file_stem = safe_filename(
+        topic
+    )
 
     audio_file = str(
-        AUDIO_DIR / f"{file_stem}.mp3"
+        AUDIO_DIR /
+        f"{file_stem}.mp3"
     )
 
     video_file = str(
-        VIDEOS_DIR / f"{file_stem}.mp4"
+        VIDEOS_DIR /
+        f"{file_stem}.mp4"
     )
 
     cost = settings["credit_cost"]
@@ -604,7 +642,7 @@ async def process_video_job(
     try:
 
         # ====================================================
-        # STEP 1 — Generate duration-aware script
+        # SCRIPT
         # ====================================================
 
         script_text, dialogue = await asyncio.to_thread(
@@ -614,11 +652,7 @@ async def process_video_job(
         )
 
         # ====================================================
-        # STEP 2 — Generate TTS
-        # ====================================================
-        #
-        # This uses the current Clip Pirate TTS interface.
-        # The selected voice profile is passed through.
+        # TEXT TO SPEECH
         # ====================================================
 
         timeline = await create_dialogue_voice(
@@ -628,7 +662,7 @@ async def process_video_job(
         )
 
         # ====================================================
-        # STEP 3 — Build final video
+        # VIDEO
         # ====================================================
 
         await asyncio.to_thread(
@@ -643,10 +677,12 @@ async def process_video_job(
         )
 
         # ====================================================
-        # Verify final output exists.
+        # VERIFY VIDEO
         # ====================================================
 
-        output_path = Path(video_file)
+        output_path = Path(
+            video_file
+        )
 
         if not output_path.exists():
 
@@ -654,19 +690,23 @@ async def process_video_job(
                 "Video generation completed without producing an MP4."
             )
 
-        if output_path.stat().st_size == 0:
+        if output_path.stat().st_size <= 0:
 
             raise RuntimeError(
                 "Generated video file is empty."
             )
 
         # ====================================================
-        # SUCCESS
+        # VIDEO URL
         # ====================================================
 
         url = (
             f"/videos/{output_path.name}"
         )
+
+        # ====================================================
+        # JOB RESULT
+        # ====================================================
 
         result = {
             "success": True,
@@ -683,8 +723,12 @@ async def process_video_job(
 
         set_result(
             job_id,
-            result
+            result,
         )
+
+        # ====================================================
+        # UPDATE PROJECT
+        # ====================================================
 
         update_project(
             project_id,
@@ -699,25 +743,27 @@ async def process_video_job(
         traceback.print_exc()
 
         # ----------------------------------------------------
-        # Refund credits when generation fails.
+        # REFUND CREDITS IF GENERATION FAILS
         # ----------------------------------------------------
 
         try:
 
             refund_credits(
                 user_id,
-                cost
+                cost,
             )
 
         except Exception:
 
             traceback.print_exc()
 
-        error_message = str(exc)
+        error_message = str(
+            exc
+        )
 
         set_error(
             job_id,
-            error_message
+            error_message,
         )
 
         update_project(
@@ -728,6 +774,10 @@ async def process_video_job(
         )
 
 
+# ============================================================
+# GENERATE VIDEO
+# ============================================================
+
 @app.post("/generate")
 @limiter.limit("5/minute")
 async def generate_video(
@@ -735,7 +785,9 @@ async def generate_video(
     body: VideoRequest,
 ):
 
-    user = current_user(request)
+    user = current_user(
+        request
+    )
 
     topic = body.topic.strip()
 
@@ -743,11 +795,11 @@ async def generate_video(
 
         raise HTTPException(
             status_code=400,
-            detail="Topic cannot be empty."
+            detail="Topic cannot be empty.",
         )
 
     # --------------------------------------------------------
-    # Validate settings.
+    # VALIDATE SETTINGS
     # --------------------------------------------------------
 
     aspect_ratio = normalize_ratio(
@@ -761,7 +813,7 @@ async def generate_video(
     duration = body.duration
 
     # --------------------------------------------------------
-    # Calculate credits.
+    # CALCULATE COST
     # --------------------------------------------------------
 
     cost = credit_cost(
@@ -769,7 +821,7 @@ async def generate_video(
     )
 
     # --------------------------------------------------------
-    # Platform-level safety limit.
+    # PLATFORM DAILY LIMIT
     # --------------------------------------------------------
 
     if not check_daily_limit():
@@ -780,11 +832,11 @@ async def generate_video(
                 f"Daily platform safety limit of "
                 f"{DAILY_GENERATION_LIMIT} reached. "
                 f"Try again later."
-            )
+            ),
         )
 
     # --------------------------------------------------------
-    # Reserve user's credits.
+    # RESERVE USER CREDITS
     # --------------------------------------------------------
 
     ok, refreshed_user = reserve_credits(
@@ -803,11 +855,11 @@ async def generate_video(
                     "Upgrade to continue generating videos."
                 ),
                 "upgrade_required": True,
-            }
+            },
         )
 
     # --------------------------------------------------------
-    # Create job/project.
+    # CREATE JOB
     # --------------------------------------------------------
 
     job_id = create_job()
@@ -822,6 +874,10 @@ async def generate_video(
         "credit_cost": cost,
     }
 
+    # --------------------------------------------------------
+    # CREATE PROJECT
+    # --------------------------------------------------------
+
     create_project(
         project_id,
         user["id"],
@@ -834,7 +890,7 @@ async def generate_video(
     )
 
     # --------------------------------------------------------
-    # Start generation.
+    # START BACKGROUND GENERATION
     # --------------------------------------------------------
 
     asyncio.create_task(
@@ -867,25 +923,20 @@ def check_status(
     job_id: str,
 ):
 
-    user = current_user(request)
+    current_user(
+        request
+    )
 
-    job = get_job(job_id)
+    job = get_job(
+        job_id
+    )
 
     if job is None:
 
         raise HTTPException(
             status_code=404,
-            detail="Job not found."
+            detail="Job not found.",
         )
-
-    # --------------------------------------------------------
-    # IMPORTANT:
-    #
-    # The current jobs.py needs to expose the owner of a job
-    # for a complete ownership check.
-    #
-    # Until then, only authenticated users can access jobs.
-    # --------------------------------------------------------
 
     if job["status"] == JobStatus.FAILED:
 
@@ -918,7 +969,9 @@ def usage(
     request: Request,
 ):
 
-    user = current_user(request)
+    user = current_user(
+        request
+    )
 
     return {
         "user": public_user(user),
@@ -953,7 +1006,7 @@ def plans():
 
 
 # ============================================================
-# DEVELOPMENT PLAN UPGRADE
+# DEVELOPMENT UPGRADE
 # ============================================================
 
 @app.post("/subscription/dev-upgrade")
@@ -964,14 +1017,14 @@ def dev_upgrade(
     if (
         os.getenv(
             "ALLOW_DEV_UPGRADE",
-            "false"
+            "false",
         ).lower()
         != "true"
     ):
 
         raise HTTPException(
-            status_code=404,
-            detail="Not found."
+            status_code=403,
+            detail="Development upgrade is currently disabled.",
         )
 
     user = current_user(
@@ -980,7 +1033,7 @@ def dev_upgrade(
 
     updated = set_plan(
         user["id"],
-        "pro"
+        "pro",
     )
 
     return {
