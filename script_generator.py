@@ -2,48 +2,30 @@ import os
 import json
 import re
 
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
 
-# ============================================================
-# OPENAI CLIENT
-# ============================================================
+DEFAULT_MODEL = os.getenv(
+    "GEMINI_MODEL",
+    "gemini-2.5-flash"
+)
 
-def get_openai_client():
-    """
-    Create the OpenAI client only when it is actually needed.
 
-    This prevents the entire FastAPI application from crashing
-    during startup when the API key is missing.
-    """
-
-    api_key = os.getenv("OPENAI_API_KEY")
+def get_gemini_client():
+    api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY is not configured on the server. "
-            "Add OPENAI_API_KEY to your deployment environment "
+            "GEMINI_API_KEY is not configured on the server. "
+            "Add GEMINI_API_KEY to your deployment environment "
             "variables and restart the application."
         )
 
-    return OpenAI(
-        api_key=api_key
-    )
+    return genai.Client(api_key=api_key)
 
-
-# ============================================================
-# TARGET WORD COUNT
-# ============================================================
 
 def target_word_count(duration: int) -> int:
-    """
-    Approximate narration length.
-
-    30 seconds  -> approximately 70 words
-    45 seconds  -> approximately 105 words
-    60 seconds  -> approximately 140 words
-    """
-
     if duration == 30:
         return 70
 
@@ -58,224 +40,186 @@ def target_word_count(duration: int) -> int:
     )
 
 
-# ============================================================
-# CLEAN AI RESPONSE
-# ============================================================
-
 def clean_response(text: str) -> str:
-    """
-    Remove Markdown code fences if the model accidentally
-    wraps its JSON response in them.
-    """
-
     if not text:
         return ""
 
     text = text.strip()
 
     text = re.sub(
-        r"^```(?:json|text)?",
+        r"^```(?:json)?\s*",
         "",
         text,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE
     )
 
     text = re.sub(
-        r"```$",
+        r"\s*```$",
         "",
         text,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE
     )
 
     return text.strip()
 
 
-# ============================================================
-# GENERATE SCRIPT
-# ============================================================
+def extract_json(text: str):
+    text = clean_response(text)
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1 or end <= start:
+        raise RuntimeError(
+            "Gemini returned an invalid script response."
+        )
+
+    try:
+        return json.loads(
+            text[start:end + 1]
+        )
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Gemini returned invalid JSON for the video script."
+        ) from exc
+
 
 def generate_script(
     topic: str,
-    duration: int = 30,
+    duration: int = 30
 ):
-    """
-    Generate a video script appropriate for the requested
-    video duration.
+    if not topic or not topic.strip():
+        raise ValueError(
+            "Video topic cannot be empty."
+        )
 
-    Returns:
-
-        script_text
-        dialogue
-    """
-
-    # --------------------------------------------------------
-    # VALIDATE DURATION
-    # --------------------------------------------------------
+    topic = topic.strip()
 
     if duration not in (30, 45, 60):
         raise ValueError(
             "Duration must be 30, 45, or 60 seconds."
         )
 
-    # --------------------------------------------------------
-    # DETERMINE APPROXIMATE SCRIPT LENGTH
-    # --------------------------------------------------------
+    word_count = target_word_count(duration)
 
-    word_count = target_word_count(
-        duration
-    )
-
-    # --------------------------------------------------------
-    # GET OPENAI CLIENT
-    # --------------------------------------------------------
-
-    client = get_openai_client()
-
-    # --------------------------------------------------------
-    # PROMPT
-    # --------------------------------------------------------
+    client = get_gemini_client()
 
     prompt = f"""
-Create a high-retention short-form video script about:
+You are the professional script-writing engine for
+Clip Pirate .ai, an AI short-video generator.
 
+Create a high-retention short-form video narration.
+
+TOPIC:
 {topic}
 
-The requested video duration is exactly {duration} seconds.
+REQUESTED DURATION:
+{duration} seconds
 
-The narration should contain approximately {word_count} spoken words.
+TARGET WORD COUNT:
+Approximately {word_count} spoken words.
 
-Requirements:
+REQUIREMENTS:
 
 - Start with a strong hook.
-- Keep the viewer engaged throughout.
+- Keep the viewer engaged.
 - Use natural spoken language.
-- Use short and clear sentences.
-- Make the information interesting and easy to understand.
+- Use short, clear sentences.
+- Make it suitable for text-to-speech.
+- Make it informative and engaging.
+- Avoid unnecessary filler.
 - Do not include camera directions.
 - Do not include scene directions.
-- Do not include sound effects.
 - Do not include timestamps.
+- Do not include sound effects.
 - Do not include production instructions.
-- Do not mention that the script was generated by AI.
+- Do not mention AI.
 - End naturally.
+- Keep the narration close to the requested word count.
 
-Return ONLY valid JSON in exactly this structure:
+Return ONLY valid JSON.
+
+Use exactly this structure:
 
 {{
-    "script": "complete narration script",
+    "script": "Complete narration as one string.",
     "dialogue": [
-        "first spoken sentence",
-        "second spoken sentence",
-        "third spoken sentence"
+        "First spoken sentence.",
+        "Second spoken sentence.",
+        "Third spoken sentence."
     ]
 }}
 """
 
-    # --------------------------------------------------------
-    # OPENAI REQUEST
-    # --------------------------------------------------------
-
     try:
-
-        response = client.chat.completions.create(
-            model=os.getenv(
-                "OPENAI_SCRIPT_MODEL",
-                "gpt-4o-mini",
-            ),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a professional short-form "
-                        "video script writer specializing in "
-                        "engaging social media videos."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-            temperature=0.8,
+        response = client.models.generate_content(
+            model=DEFAULT_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.8,
+                max_output_tokens=500
+            )
         )
 
     except Exception as exc:
+        error_text = str(exc)
+
+        if "429" in error_text:
+            raise RuntimeError(
+                "Gemini API rate limit or quota reached. "
+                "Please try again later."
+            ) from exc
+
+        if "401" in error_text or "403" in error_text:
+            raise RuntimeError(
+                "Gemini API authentication failed. "
+                "Check your GEMINI_API_KEY."
+            ) from exc
 
         raise RuntimeError(
-            f"OpenAI script generation failed: {exc}"
+            f"Gemini script generation failed: {error_text}"
         ) from exc
 
-    # --------------------------------------------------------
-    # GET RESPONSE
-    # --------------------------------------------------------
-
-    if not response.choices:
-
-        raise RuntimeError(
-            "OpenAI returned no choices."
-        )
-
-    content = response.choices[0].message.content
-
-    if not content:
-
-        raise RuntimeError(
-            "OpenAI returned an empty script."
-        )
-
-    content = clean_response(
-        content
+    content = getattr(
+        response,
+        "text",
+        None
     )
 
-    # --------------------------------------------------------
-    # PARSE JSON
-    # --------------------------------------------------------
-
-    try:
-
-        data = json.loads(
-            content
+    if not content:
+        raise RuntimeError(
+            "Gemini returned an empty script."
         )
 
-    except json.JSONDecodeError as exc:
+    data = extract_json(content)
 
+    if not isinstance(data, dict):
         raise RuntimeError(
-            "OpenAI returned invalid script JSON."
-        ) from exc
-
-    # --------------------------------------------------------
-    # EXTRACT SCRIPT
-    # --------------------------------------------------------
+            "Gemini returned an invalid script structure."
+        )
 
     script_text = str(
-        data.get(
-            "script",
-            "",
-        )
+        data.get("script", "")
     ).strip()
 
     if not script_text:
-
         raise RuntimeError(
-            "OpenAI returned no script text."
+            "Gemini returned no script text."
         )
-
-    # --------------------------------------------------------
-    # EXTRACT DIALOGUE
-    # --------------------------------------------------------
 
     dialogue = data.get(
         "dialogue",
-        [],
+        []
     )
 
-    if not isinstance(
-        dialogue,
-        list,
-    ):
-
+    if not isinstance(dialogue, list):
         raise RuntimeError(
-            "OpenAI returned an invalid dialogue format."
+            "Gemini returned an invalid dialogue format."
         )
 
     dialogue = [
@@ -285,16 +229,8 @@ Return ONLY valid JSON in exactly this structure:
     ]
 
     if not dialogue:
-
         raise RuntimeError(
-            "OpenAI returned no dialogue."
+            "Gemini returned no dialogue."
         )
 
-    # --------------------------------------------------------
-    # RETURN RESULTS
-    # --------------------------------------------------------
-
-    return (
-        script_text,
-        dialogue,
-    )
+    return script_text, dialogue
