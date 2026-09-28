@@ -79,7 +79,7 @@ def verify_password(password, stored):
 
 def create_user(name, email, password):
     user_id = secrets.token_hex(16)
-    reset_date = datetime.now(timezone.utc).date().isoformat()
+    reset_date = _next_month_start().isoformat()
     with _conn() as c:
         c.execute(
             'INSERT INTO users(id,name,email,password_hash,plan,credits,monthly_limit,reset_date,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
@@ -126,10 +126,18 @@ def delete_session(token):
         c.execute('DELETE FROM sessions WHERE token_hash=?', (token_hash,))
 
 
+def _next_month_start():
+    today = datetime.now(timezone.utc).date()
+    if today.month == 12:
+        return today.replace(year=today.year + 1, month=1, day=1)
+    return today.replace(month=today.month + 1, day=1)
+
 def _reset_if_needed(c, user):
-    today = datetime.now(timezone.utc).date().isoformat()
-    if user['reset_date'] != today:
-        c.execute('UPDATE users SET credits=monthly_limit, reset_date=? WHERE id=?', (today, user['id']))
+    today = datetime.now(timezone.utc).date()
+    reset = datetime.fromisoformat(user['reset_date']).date()
+    if today >= reset:
+        next_reset = _next_month_start()
+        c.execute('UPDATE users SET credits=monthly_limit, reset_date=? WHERE id=?', (next_reset.isoformat(), user['id']))
         return c.execute('SELECT * FROM users WHERE id=?', (user['id'],)).fetchone()
     return user
 

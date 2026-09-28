@@ -7,11 +7,11 @@ def _headers():
     return {"Authorization": os.environ["PEXELS_API_KEY"]}
 
 
-def _query_pexels(query, count):
+def _query_pexels(query, count, orientation=None):
     url = "https://api.pexels.com/videos/search"
     params = {
         "query": query,
-        "orientation": "portrait",
+        "orientation": orientation,
         "per_page": count,
     }
     response = requests.get(url, headers=_headers(), params=params, timeout=15)
@@ -19,11 +19,12 @@ def _query_pexels(query, count):
     return response.json().get("videos", [])
 
 
-def search_video_clips(query, count=1):
+def search_video_clips(query, count=1, aspect_ratio="4:3"):
     query = (query or "").strip() or "abstract background"
 
     try:
-        videos = _query_pexels(query, count)
+        orientation = "portrait" if aspect_ratio == "9:16" else "landscape"
+        videos = _query_pexels(query, count, orientation)
     except Exception as e:
         print("[stock_footage] Pexels search failed for '" + query + "': " + str(e))
         videos = []
@@ -31,7 +32,7 @@ def search_video_clips(query, count=1):
     if not videos:
         print("[stock_footage] No results for '" + query + "', falling back to generic footage")
         try:
-            videos = _query_pexels("abstract background", count)
+            videos = _query_pexels("abstract background", count, orientation)
         except Exception as e:
             print("[stock_footage] Fallback search also failed: " + str(e))
             videos = []
@@ -39,9 +40,7 @@ def search_video_clips(query, count=1):
     clip_urls = []
     for video in videos:
         files = video["video_files"]
-        portrait_files = [f for f in files if f.get("height", 0) > f.get("width", 0)]
-        pool = portrait_files or files
-        pool_sorted = sorted(pool, key=lambda f: f.get("width", 0))
+        pool_sorted = sorted(files, key=lambda f: f.get("width", 0))
         chosen = pool_sorted[0]  # smallest file, keeps memory use low
         clip_urls.append(chosen["link"])
 
